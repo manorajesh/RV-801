@@ -1,119 +1,81 @@
-pub enum RV32I {
-    LUI, // Load Upper Immediate
-    AUIPC, // Add Upper Immediate to PC
-    JAL, // Jump and Link
-    JALR, // Jump and Link Register
-    BEQ, // Branch if Equal
-    BNE, // Branch if Not Equal
-    BLT, // Branch if Less Than
-    BGE, // Branch if Greater Than or Equal
-    BLTU, // Branch if Less Than Unsigned
-    BGEU, // Branch if Greater Than or Equal Unsigned
-    LB, // Load Byte
-    LH, // Load Halfword
-    LW, // Load Word
-    LBU, // Load Byte Unsigned
-    LHU, // Load Halfword Unsigned
-    SB, // Store Byte
-    SH, // Store Halfword
-    SW, // Store Word
-    ADDI, // Add Immediate
-    SLTI, // Set Less Than Immediate
-    SLTIU, // Set Less Than Immediate Unsigned
-    XORI, // Exclusive OR Immediate
-    ORI, // OR Immediate
-    ANDI, // AND Immediate
-    SLLI, // Shift Left Logical Immediate
-    SRLI, // Shift Right Logical Immediate
-    SRAI, // Shift Right Arithmetic Immediate
-    ADD, // Add
-    SUB, // Subtract
-    SLL, // Shift Left Logical
-    SLT, // Set Less Than
-    SLTU, // Set Less Than Unsigned
-    XOR, // Exclusive OR
-    SRL, // Shift Right Logical
-    SRA, // Shift Right Arithmetic
-    OR, // OR
-    AND, // AND
-    FENCE, // Fence
-    ECALL, // Environment Call
-    EBREAK, // Environment Break
+use std::fs;
+
+use crate::isa::Instruction;
+
+pub struct CPU {
+    regs: [u32; 32],
+    pc: usize,
+    memory: [u8; 0x10000],
+    pub exit_on_nop: bool,
+    pub last_inst: Option<Instruction>,
 }
 
-pub struct R {
-    funct7: u8,
-    rs2: u8,
-    rs1: u8,
-    funct3: u8,
-    rd: u8,
-    opcode: u8,
-}
+pub trait Interface {
+    fn load(&mut self, instructions: &[u8]);
 
-pub struct I {
-    imm: u16,
-    rs1: u8,
-    funct3: u8,
-    rd: u8,
-    opcode: u8,
-}
+    fn run(&mut self) -> u8;
 
-pub struct S {
-    imm: u16,
-    rs2: u8,
-    rs1: u8,
-    funct3: u8,
-    opcode: u8,
-}
+    fn boot(&mut self, path: &str) -> u8 {
+        let instructions = fs::read(path).expect("Unable to read file");
+        self.load(&instructions);
+        self.run()
+    }
 
-pub struct B {
-    imm: u16,
-    rs2: u8,
-    rs1: u8,
-    funct3: u8,
-    opcode: u8,
-}
-
-pub struct U {
-    imm: u32,
-    rd: u8,
-    opcode: u8,
-}
-
-pub struct J {
-    imm: u32,
-    rd: u8,
-    opcode: u8,
-}
-
-pub enum InstructionType {
-    R(R),
-    I(I),
-    S(S),
-    B(B),
-    U(U),
-    J(J),
-}
-
-pub struct Instruction {
-    inst_type: InstructionType,
-    inst: RV32I,
-}
-
-impl Instruction {
-    pub fn from(inst: u32) -> Self {
-
+    fn from_inst(&mut self, instruction: u32) {
+        let bytes = instruction.to_le_bytes();
+        self.load(&bytes);
     }
 }
 
-fn get_opcode(inst: u32) -> u8 {
-    (inst & 0x7F) as u8
+impl CPU {
+    pub fn new() -> Self {
+        CPU {
+            regs: [0; 32],
+            pc: 0,
+            memory: [0; 0x10000],
+            exit_on_nop: false,
+            last_inst: None,
+        }
+    }
+
+    fn fetch(&mut self) -> u32 {
+        let inst = u32::from_le_bytes([
+            self.memory[self.pc],
+            self.memory[self.pc + 1],
+            self.memory[self.pc + 2],
+            self.memory[self.pc + 3],
+        ]);
+        self.pc += 4;
+        inst
+    }
+
+    fn decode(&self, inst: u32) -> Instruction {
+        Instruction::from(inst)
+    }
+
+    // for now, just print the instruction
+    fn execute(&mut self, inst: Instruction) -> u8 {
+        println!("{:?}", inst);
+        0
+    }
 }
 
-fn get_inst_type(opcode: u8) -> InstructionType {
-    match opcode {
-        0b0110111 || 0b0010111 => {
-            
+impl Interface for CPU {
+    fn load(&mut self, instructions: &[u8]) {
+        for (i, inst) in instructions.iter().enumerate() {
+            self.memory[i + self.pc] = *inst;
+        }
+    }
+
+    fn run(&mut self) -> u8 {
+        loop {
+            let inst = self.fetch();
+            let inst = self.decode(inst);
+            self.execute(inst);
+            self.last_inst = Some(inst);
+            if self.exit_on_nop && inst.is_nop() {
+                return 0;
+            }
         }
     }
 }
