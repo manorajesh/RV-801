@@ -44,64 +44,64 @@ pub enum RV32I {
 
 #[derive(Debug, Clone, Copy)]
 pub struct R {
-    funct7: u8,
-    rs2: u8,
-    rs1: u8,
-    funct3: u8,
-    rd: u8,
-    opcode: u8,
+    pub funct7: u8,
+    pub rs2: u8,
+    pub rs1: u8,
+    pub funct3: u8,
+    pub rd: u8,
+    pub opcode: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct I {
-    imm: u16,
-    rs1: u8,
-    funct3: u8,
-    rd: u8,
-    opcode: u8,
+    pub imm: u16,
+    pub rs1: u8,
+    pub funct3: u8,
+    pub rd: u8,
+    pub opcode: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct S {
-    imm: u16,
-    rs2: u8,
-    rs1: u8,
-    funct3: u8,
-    opcode: u8,
+    pub imm: u16,
+    pub rs2: u8,
+    pub rs1: u8,
+    pub funct3: u8,
+    pub opcode: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct B {
-    imm: u16,
-    rs2: u8,
-    rs1: u8,
-    funct3: u8,
-    opcode: u8,
+    pub imm: u16,
+    pub rs2: u8,
+    pub rs1: u8,
+    pub funct3: u8,
+    pub opcode: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct U {
-    imm: u32,
-    rd: u8,
-    opcode: u8,
+    pub imm: u32,
+    pub rd: u8,
+    pub opcode: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct J {
-    imm: u32,
-    rd: u8,
-    opcode: u8,
+    pub imm: u32,
+    pub rd: u8,
+    pub opcode: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct FENCE {
-    fm: u8,
-    pred: u8,
-    succ: u8,
-    rs1: u8,
-    funct3: u8,
-    rd: u8,
-    opcode: u8,
+    pub fm: u8,
+    pub pred: u8,
+    pub succ: u8,
+    pub rs1: u8,
+    pub funct3: u8,
+    pub rd: u8,
+    pub opcode: u8,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -117,8 +117,8 @@ pub enum InstructionType {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Instruction {
-    inst_type: InstructionType,
-    inst: RV32I,
+    pub inst_type: InstructionType,
+    pub inst: RV32I,
     // doesn't mean anything if I am inputting argument (supposed to confirm parsing)
     pub raw: u32,
 }
@@ -147,6 +147,10 @@ impl Instruction {
             }
             _ => false,
         }
+    }
+
+    pub fn get_args(&self) -> InstructionType {
+        self.inst_type
     }
 }
 

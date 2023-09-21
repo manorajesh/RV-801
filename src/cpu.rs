@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::isa::Instruction;
+use crate::isa::{Instruction, RV32I, InstructionType};
 
 pub struct CPU {
     regs: [u32; 32],
@@ -175,9 +175,291 @@ impl CPU {
         Instruction::from(inst)
     }
 
-    // for now, just print the instruction
+    pub fn print_state(&self) {
+        println!("PC: {:08X}", self.pc);
+        for (i, reg) in self.regs.iter().enumerate() {
+            println!("x{:02}: {:08}", i, reg);
+        }
+    }
+
     fn execute(&mut self, inst: Instruction) -> u8 {
-        println!("{:?}", inst);
+        match inst.inst {
+            RV32I::LUI => {
+                let args = if let InstructionType::U(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for LUI")
+                };
+
+                self.lui(args.rd, args.imm);
+            }
+
+            RV32I::AUIPC => {
+                let args = if let InstructionType::U(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for AUIPC")
+                };
+
+                self.auipc(args.rd, args.imm);
+            }
+
+            RV32I::JAL => {
+                let args = if let InstructionType::J(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for JAL")
+                };
+
+                self.jal(args.rd, args.imm);
+            }
+
+            RV32I::JALR => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for JALR")
+                };
+
+                self.jalr(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::BEQ => {
+                let args = if let InstructionType::B(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for BEQ")
+                };
+
+                self.beq(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::BNE => {
+                let args = if let InstructionType::B(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for BNE")
+                };
+
+                self.bne(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::BLT => {
+                let args = if let InstructionType::B(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for BLT")
+                };
+
+                self.blt(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::BGE => {
+                let args = if let InstructionType::B(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for BGE")
+                };
+
+                self.bge(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::BLTU => {
+                let args = if let InstructionType::B(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for BLTU")
+                };
+
+                self.bltu(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::BGEU => {
+                let args = if let InstructionType::B(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for BGEU")
+                };
+
+                self.bgeu(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::LB => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for LB")
+                };
+
+                self.lb(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::LH => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for LH")
+                };
+
+                self.lh(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::LW => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for LW")
+                };
+
+                self.lw(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::LBU => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for LBU")
+                };
+
+                self.lbu(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::LHU => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for LHU")
+                };
+
+                self.lhu(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::SB => {
+                let args = if let InstructionType::S(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SB")
+                };
+
+                self.sb(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::SH => {
+                let args = if let InstructionType::S(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SH")
+                };
+
+                self.sh(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::SW => {
+                let args = if let InstructionType::S(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SW")
+                };
+
+                self.sw(args.rs1, args.rs2, args.imm as u32);
+            }
+
+            RV32I::ADDI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for ADDI")
+                };
+
+                self.addi(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::SLTI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SLTI")
+                };
+
+                self.slti(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::SLTIU => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SLTIU")
+                };
+
+                self.sltiu(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::XORI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for XORI")
+                };
+
+                self.xori(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::ORI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for ORI")
+                };
+
+                self.ori(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::ANDI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for ANDI")
+                };
+
+                self.andi(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::SLLI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SLLI")
+                };
+
+                self.slli(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::SRLI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SRLI")
+                };
+
+                self.srli(args.rd, args.rs1, args.imm as u32);
+            }
+
+            RV32I::SRAI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SRAI")
+                };
+
+                self.srai(args.rd, args.rs1, args.imm as u32);
+            }
+
+            _ => {
+                println!("Unimplemented instruction: {:?}", inst);
+                return 1;
+            }            
+        }
+
         0
     }
 }
@@ -248,4 +530,191 @@ impl RV32ISA for CPU {
             self.pc = ((self.pc as i32) + ((imm as i32) << 1)) as usize;
         }
     }
+
+    fn bge(&mut self, rs1: u8, rs2: u8, imm: u32) {
+        let rs1_val = self.regs[rs1 as usize] as i32;
+        let rs2_val = self.regs[rs2 as usize] as i32;
+        if rs1_val >= rs2_val {
+            self.pc = ((self.pc as i32) + ((imm as i32) << 1)) as usize;
+        }
+    }
+
+    fn bltu(&mut self, rs1: u8, rs2: u8, imm: u32) {
+        let rs1_val = self.regs[rs1 as usize];
+        let rs2_val = self.regs[rs2 as usize];
+        if rs1_val < rs2_val {
+            self.pc = ((self.pc as i32) + ((imm as i32) << 1)) as usize;
+        }
+    }
+
+    fn bgeu(&mut self, rs1: u8, rs2: u8, imm: u32) {
+        let rs1_val = self.regs[rs1 as usize];
+        let rs2_val = self.regs[rs2 as usize];
+        if rs1_val >= rs2_val {
+            self.pc = ((self.pc as i32) + ((imm as i32) << 1)) as usize;
+        }
+    }
+
+    fn lb(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        self.regs[rd as usize] = self.memory[addr] as i8 as i32 as u32;
+    }
+
+    fn lh(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        self.regs[rd as usize] = u16::from_le_bytes([
+            self.memory[addr],
+            self.memory[addr + 1],
+        ]) as i16 as i32 as u32;
+    }
+
+    fn lw(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        self.regs[rd as usize] = u32::from_le_bytes([
+            self.memory[addr],
+            self.memory[addr + 1],
+            self.memory[addr + 2],
+            self.memory[addr + 3],
+        ]);
+    }
+
+    fn lbu(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        self.regs[rd as usize] = self.memory[addr] as u32;
+    }
+
+    fn lhu(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        self.regs[rd as usize] = u16::from_le_bytes([
+            self.memory[addr],
+            self.memory[addr + 1],
+        ]) as u32;
+    }
+
+    fn sb(&mut self, rs1: u8, rs2: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        self.memory[addr] = self.regs[rs2 as usize] as u8;
+    }
+
+    fn sh(&mut self, rs1: u8, rs2: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        let bytes = self.regs[rs2 as usize].to_le_bytes();
+        self.memory[addr] = bytes[0];
+        self.memory[addr + 1] = bytes[1];
+    }
+
+    fn sw(&mut self, rs1: u8, rs2: u8, imm: u32) {
+        let addr = self.regs[rs1 as usize].wrapping_add(imm) as usize;
+        let bytes = self.regs[rs2 as usize].to_le_bytes();
+        self.memory[addr] = bytes[0];
+        self.memory[addr + 1] = bytes[1];
+        self.memory[addr + 2] = bytes[2];
+        self.memory[addr + 3] = bytes[3];
+    }
+
+    fn addi(&mut self, rd: u8, rs1: u8, imm: u32) {
+        self.regs[rd as usize] = self.regs[rs1 as usize].wrapping_add(imm);
+    }
+
+    fn slti(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let rs1_val = self.regs[rs1 as usize] as i32;
+        if rs1_val < (imm as i32) {
+            self.regs[rd as usize] = 1;
+        } else {
+            self.regs[rd as usize] = 0;
+        }
+    }
+
+    fn sltiu(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let rs1_val = self.regs[rs1 as usize];
+        if rs1_val < imm {
+            self.regs[rd as usize] = 1;
+        } else {
+            self.regs[rd as usize] = 0;
+        }
+    }
+
+    fn xori(&mut self, rd: u8, rs1: u8, imm: u32) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] ^ imm;
+    }
+
+    fn ori(&mut self, rd: u8, rs1: u8, imm: u32) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] | imm;
+    }
+
+    fn andi(&mut self, rd: u8, rs1: u8, imm: u32) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] & imm;
+    }
+
+    fn slli(&mut self, rd: u8, rs1: u8, imm: u32) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] << imm;
+    }
+
+    fn srli(&mut self, rd: u8, rs1: u8, imm: u32) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] >> imm;
+    }
+
+    fn srai(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let rs1_val = self.regs[rs1 as usize] as i32;
+        self.regs[rd as usize] = (rs1_val >> imm) as u32;
+    }
+
+    fn add(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        self.regs[rd as usize] = self.regs[rs1 as usize].wrapping_add(self.regs[rs2 as usize]);
+    }
+
+    fn sub(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        self.regs[rd as usize] = self.regs[rs1 as usize].wrapping_sub(self.regs[rs2 as usize]);
+    }
+
+    fn sll(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] << (self.regs[rs2 as usize] & 0x1F);
+    }
+
+    fn slt(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        let rs1_val = self.regs[rs1 as usize] as i32;
+        let rs2_val = self.regs[rs2 as usize] as i32;
+        if rs1_val < rs2_val {
+            self.regs[rd as usize] = 1;
+        } else {
+            self.regs[rd as usize] = 0;
+        }
+    }
+
+    fn sltu(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        let rs1_val = self.regs[rs1 as usize];
+        let rs2_val = self.regs[rs2 as usize];
+        if rs1_val < rs2_val {
+            self.regs[rd as usize] = 1;
+        } else {
+            self.regs[rd as usize] = 0;
+        }
+    }
+
+    fn xor(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] ^ self.regs[rs2 as usize];
+    }
+
+    fn srl(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] >> (self.regs[rs2 as usize] & 0x1F);
+    }
+
+    fn sra(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        let rs1_val = self.regs[rs1 as usize] as i32;
+        self.regs[rd as usize] = (rs1_val >> (self.regs[rs2 as usize] & 0x1F)) as u32;
+    }
+
+    fn or(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] | self.regs[rs2 as usize];
+    }
+
+    fn and(&mut self, rd: u8, rs1: u8, rs2: u8) {
+        self.regs[rd as usize] = self.regs[rs1 as usize] & self.regs[rs2 as usize];
+    }
+
+    fn fence(&mut self, rd: u8, rs1: u8, imm: u32) {}
+
+    fn ecall(&mut self, rd: u8, rs1: u8, imm: u32) {}
+
+    fn ebreak(&mut self, rd: u8, rs1: u8, imm: u32) {}
 }
