@@ -54,7 +54,7 @@ pub struct R {
 
 #[derive(Debug, Clone, Copy)]
 pub struct I {
-    pub imm: u16,
+    pub imm: i16,
     pub rs1: u8,
     pub funct3: u8,
     pub rd: u8,
@@ -63,7 +63,7 @@ pub struct I {
 
 #[derive(Debug, Clone, Copy)]
 pub struct S {
-    pub imm: u16,
+    pub imm: i16,
     pub rs2: u8,
     pub rs1: u8,
     pub funct3: u8,
@@ -72,7 +72,7 @@ pub struct S {
 
 #[derive(Debug, Clone, Copy)]
 pub struct B {
-    pub imm: u16,
+    pub imm: i16,
     pub rs2: u8,
     pub rs1: u8,
     pub funct3: u8,
@@ -88,7 +88,7 @@ pub struct U {
 
 #[derive(Debug, Clone, Copy)]
 pub struct J {
-    pub imm: u32,
+    pub imm: i32,
     pub rd: u8,
     pub opcode: u8,
 }
@@ -136,6 +136,10 @@ impl Instruction {
     }
 
     pub fn is_nop(&self) -> bool {
+        if self.raw == 0 {
+            return true;
+        }
+
         match self.inst {
             RV32I::ADDI => {
                 let i = match self.inst_type {
@@ -148,17 +152,13 @@ impl Instruction {
             _ => false,
         }
     }
-
-    pub fn get_args(&self) -> InstructionType {
-        self.inst_type
-    }
 }
 
 fn get_opcode(inst: u32) -> u8 {
     (inst & 0x7F) as u8
 }
 
-fn parse_inst(inst: u32) -> Option<InstructionType> {
+fn parse_inst(inst: u32) -> Result<InstructionType, String> {
     let opcode = get_opcode(inst);
 
     match opcode {
@@ -167,25 +167,25 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
             let imm = ((inst >> 12) & 0xFFFFF) as u32;
             let rd = ((inst >> 7) & 0x1F) as u8;
 
-            Some(InstructionType::U(U { imm, rd, opcode }))
+            Ok(InstructionType::U(U { imm, rd, opcode }))
         }
 
         // J-Type
         0b1101111 => {
-            let imm = ((inst >> 12) & 0xFFFFF) as u32;
+            let imm = ((((inst >> 12) & 0xFFFFF) as i32) << 11) >> 11;
             let rd = ((inst >> 7) & 0x1F) as u8;
 
-            Some(InstructionType::J(J { imm, rd, opcode }))
+            Ok(InstructionType::J(J { imm, rd, opcode }))
         }
 
         // I-Type
         0b1100111 | 0b0000011 | 0b0010011 => {
-            let imm = ((inst >> 20) & 0xFFF) as u16;
+            let imm = ((((inst >> 20) & 0xFFF) as i16) << 4) >> 4;
             let rs1 = ((inst >> 15) & 0x1F) as u8;
             let funct3 = ((inst >> 12) & 0x7) as u8;
             let rd = ((inst >> 7) & 0x1F) as u8;
 
-            Some(InstructionType::I(I {
+            Ok(InstructionType::I(I {
                 imm,
                 rs1,
                 funct3,
@@ -200,11 +200,12 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
                 | (((inst >> 7) & 0x1) << 11)
                 | (((inst >> 25) & 0x3F) << 5)
                 | (((inst >> 8) & 0xF) << 1)) as u16;
+            let imm = ((((imm) as i16) << 4) >> 4) as i16;
             let rs2 = ((inst >> 20) & 0x1F) as u8;
             let rs1 = ((inst >> 15) & 0x1F) as u8;
             let funct3 = ((inst >> 12) & 0x7) as u8;
 
-            Some(InstructionType::B(B {
+            Ok(InstructionType::B(B {
                 imm,
                 rs2,
                 rs1,
@@ -216,11 +217,12 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
         // S-Type
         0b0100011 => {
             let imm = ((((inst >> 25) & 0x7F) << 5) | (((inst >> 7) & 0x1F) << 0)) as u16;
+            let imm = ((((imm) as i16) << 4) >> 4) as i16;
             let rs2 = ((inst >> 20) & 0x1F) as u8;
             let rs1 = ((inst >> 15) & 0x1F) as u8;
             let funct3 = ((inst >> 12) & 0x7) as u8;
 
-            Some(InstructionType::S(S {
+            Ok(InstructionType::S(S {
                 imm,
                 rs2,
                 rs1,
@@ -237,7 +239,7 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
             let funct3 = ((inst >> 12) & 0x7) as u8;
             let rd = ((inst >> 7) & 0x1F) as u8;
 
-            Some(InstructionType::R(R {
+            Ok(InstructionType::R(R {
                 funct7,
                 rs2,
                 rs1,
@@ -249,7 +251,7 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
 
         // ECALL, EBREAK
         0b1110011 => {
-            let imm = ((inst >> 20) & 0xFFF) as u16;
+            let imm = ((((inst >> 20) & 0xFFF) as i16) << 4) >> 4;
             let rs1 = ((inst >> 15) & 0x1F) as u8;
             let funct3 = ((inst >> 12) & 0x7) as u8;
             let rd = ((inst >> 7) & 0x1F) as u8;
@@ -259,7 +261,7 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
             assert_eq!(funct3, 0);
             assert_eq!(rd, 0);
 
-            Some(InstructionType::I(I {
+            Ok(InstructionType::I(I {
                 imm,
                 rs1,
                 funct3,
@@ -279,7 +281,7 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
 
             assert_eq!(funct3, 0);
 
-            Some(InstructionType::FENCE(FENCE {
+            Ok(InstructionType::FENCE(FENCE {
                 fm,
                 pred,
                 succ,
@@ -298,7 +300,7 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
             let funct3 = 0;
             let rd = 0;
 
-            Some(InstructionType::I(I {
+            Ok(InstructionType::I(I {
                 imm,
                 rs1,
                 funct3,
@@ -307,105 +309,105 @@ fn parse_inst(inst: u32) -> Option<InstructionType> {
             }))
         }
 
-        _ => None,
+        _ => Err(format!("Invalid opcode: {:#b}", opcode)),
     }
 }
 
-fn get_inst(inst: InstructionType) -> Option<RV32I> {
+fn get_inst(inst: InstructionType) -> Result<RV32I, String> {
     match inst {
         InstructionType::R(i) => match i.funct7 {
             0b0000000 => match i.funct3 {
-                0b000 => Some(RV32I::ADD),
-                0b001 => Some(RV32I::SLL),
-                0b010 => Some(RV32I::SLT),
-                0b011 => Some(RV32I::SLTU),
-                0b100 => Some(RV32I::XOR),
-                0b101 => Some(RV32I::SRL),
-                0b110 => Some(RV32I::OR),
-                0b111 => Some(RV32I::AND),
-                _ => None,
+                0b000 => Ok(RV32I::ADD),
+                0b001 => Ok(RV32I::SLL),
+                0b010 => Ok(RV32I::SLT),
+                0b011 => Ok(RV32I::SLTU),
+                0b100 => Ok(RV32I::XOR),
+                0b101 => Ok(RV32I::SRL),
+                0b110 => Ok(RV32I::OR),
+                0b111 => Ok(RV32I::AND),
+                _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
             },
             0b0100000 => match i.funct3 {
-                0b000 => Some(RV32I::SUB),
-                0b101 => Some(RV32I::SRA),
-                _ => None,
+                0b000 => Ok(RV32I::SUB),
+                0b101 => Ok(RV32I::SRA),
+                _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
             },
-            _ => None,
+            _ => Err(format!("Invalid funct7: {:#b}", i.funct7)),
         },
 
         InstructionType::B(i) => match i.funct3 {
-            0b000 => Some(RV32I::BEQ),
-            0b001 => Some(RV32I::BNE),
-            0b100 => Some(RV32I::BLT),
-            0b101 => Some(RV32I::BGE),
-            0b110 => Some(RV32I::BLTU),
-            0b111 => Some(RV32I::BGEU),
-            _ => None,
+            0b000 => Ok(RV32I::BEQ),
+            0b001 => Ok(RV32I::BNE),
+            0b100 => Ok(RV32I::BLT),
+            0b101 => Ok(RV32I::BGE),
+            0b110 => Ok(RV32I::BLTU),
+            0b111 => Ok(RV32I::BGEU),
+            _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
         },
 
         InstructionType::I(i) => match i.opcode {
             0b1100111 => match i.funct3 {
-                0b000 => Some(RV32I::JALR),
-                _ => None,
+                0b000 => Ok(RV32I::JALR),
+                _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
             },
             0b0000011 => match i.funct3 {
-                0b000 => Some(RV32I::LB),
-                0b001 => Some(RV32I::LH),
-                0b010 => Some(RV32I::LW),
-                0b100 => Some(RV32I::LBU),
-                0b101 => Some(RV32I::LHU),
-                _ => None,
+                0b000 => Ok(RV32I::LB),
+                0b001 => Ok(RV32I::LH),
+                0b010 => Ok(RV32I::LW),
+                0b100 => Ok(RV32I::LBU),
+                0b101 => Ok(RV32I::LHU),
+                _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
             },
             0b0010011 => match i.funct3 {
-                0b001 => Some(RV32I::SLLI),
+                0b001 => Ok(RV32I::SLLI),
                 0b101 => match i.imm & 0x400 {
-                    0x400 => Some(RV32I::SRAI),
-                    _ => Some(RV32I::SRLI),
+                    0x400 => Ok(RV32I::SRAI),
+                    _ => Ok(RV32I::SRLI),
                 },
-                0b000 => Some(RV32I::ADDI),
-                0b010 => Some(RV32I::SLTI),
-                0b011 => Some(RV32I::SLTIU),
-                0b100 => Some(RV32I::XORI),
-                0b110 => Some(RV32I::ORI),
-                0b111 => Some(RV32I::ANDI),
-                _ => None,
+                0b000 => Ok(RV32I::ADDI),
+                0b010 => Ok(RV32I::SLTI),
+                0b011 => Ok(RV32I::SLTIU),
+                0b100 => Ok(RV32I::XORI),
+                0b110 => Ok(RV32I::ORI),
+                0b111 => Ok(RV32I::ANDI),
+                _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
             },
             0b1110011 => match i.funct3 {
-                0b000 => Some(RV32I::ECALL),
-                0b001 => Some(RV32I::EBREAK),
-                _ => None,
+                0b000 => Ok(RV32I::ECALL),
+                0b001 => Ok(RV32I::EBREAK),
+                _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
             },
 
             0b0000000 => {
                 assert_eq!(i.funct3, 0);
                 assert_eq!(i.imm, 0);
 
-                Some(RV32I::ADDI)
+                Ok(RV32I::ADDI)
             }
-            _ => None,
+            _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
         },
 
         InstructionType::S(i) => match i.funct3 {
-            0b000 => Some(RV32I::SB),
-            0b001 => Some(RV32I::SH),
-            0b010 => Some(RV32I::SW),
-            _ => None,
+            0b000 => Ok(RV32I::SB),
+            0b001 => Ok(RV32I::SH),
+            0b010 => Ok(RV32I::SW),
+            _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
         },
 
         InstructionType::U(i) => match i.opcode {
-            0b0110111 => Some(RV32I::LUI),
-            0b0010111 => Some(RV32I::AUIPC),
-            _ => None,
+            0b0110111 => Ok(RV32I::LUI),
+            0b0010111 => Ok(RV32I::AUIPC),
+            _ => Err(format!("Invalid funct3: {:#?}", i)),
         },
 
         InstructionType::J(i) => match i.opcode {
-            0b1101111 => Some(RV32I::JAL),
-            _ => None,
+            0b1101111 => Ok(RV32I::JAL),
+            _ => Err(format!("Invalid funct3: {:#?}", i)),
         },
 
         InstructionType::FENCE(i) => match i.opcode {
-            0b0001111 => Some(RV32I::FENCE),
-            _ => None,
+            0b0001111 => Ok(RV32I::FENCE),
+            _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
         },
     }
 }
