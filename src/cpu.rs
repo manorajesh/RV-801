@@ -12,7 +12,7 @@ pub struct CPU {
 
 trait RV32ISA {
     // Add Immediate: Adds an immediate value to rs1 and stores the result in rd.
-    fn addi(&mut self, rd: u8, rs1: u8, imm: i16);
+    fn addi(&mut self, rd: u8, rs1: u8, imm: u32);
 }
 
 pub trait Interface {
@@ -120,22 +120,15 @@ impl Interface for CPU {
 }
 
 impl RV32ISA for CPU {
-    fn addi(&mut self, rd: u8, rs1: u8, imm: i16) {
-        self.regs[rd as usize] = self.regs[rs1 as usize].wrapping_add(imm as u32);
+    fn addi(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let imm = sext(imm);
+        self.regs[rd as usize] = self.regs[rs1 as usize].wrapping_add_signed(imm);
     }
 }
 
-trait TwelveBitWrap {
-    fn wrapping_12bit_add(&self, rhs: Self) -> i16;
-}
-
-impl TwelveBitWrap for i16 {
-    fn wrapping_12bit_add(&self, rhs: Self) -> i16 {
-        let result = self.wrapping_add(rhs) & 0xFFF;
-
-        if result >= 2048 {
-            return -2048;
-        }
-        result
-    }
+fn sext(x: u32) -> i32 {
+    // Shift left to bring the sign bit to the leftmost position
+    let shifted = x << 20;
+    // Arithmetic shift right to sign-extend and bring back to original position
+    (shifted as i32) >> 20
 }

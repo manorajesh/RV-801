@@ -44,7 +44,7 @@ pub enum RV32I {
 
 #[derive(Debug, Clone, Copy)]
 pub struct I {
-    pub imm: i16,
+    pub imm: u32,
     pub rs1: u8,
     pub funct3: u8,
     pub rd: u8,
@@ -105,7 +105,7 @@ fn parse_inst(inst: u32) -> Result<InstructionType, String> {
     match opcode {
         // I-Type
         0b1100111 | 0b0000011 | 0b0010011 => {
-            let imm = ((((inst >> 20) & 0xFFF) as i16) << 4) >> 4;
+            let imm = inst >> 20;
             let rs1 = ((inst >> 15) & 0x1F) as u8;
             let funct3 = ((inst >> 12) & 0x7) as u8;
             let rd = ((inst >> 7) & 0x1F) as u8;
