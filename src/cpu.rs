@@ -28,6 +28,15 @@ trait RV32ISA {
 
     // AND Immediate: Bitwise AND rs1 and the immediate value and store the result in rd.
     fn andi(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // Shift Left Logical Immediate: Shift rs1 left by the immediate value and store the result in rd.
+    fn slli(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // Shift Right Logical Immediate: Shift rs1 right by the immediate value and store the result in rd.
+    fn srli(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // Shift Right Arithmetic Immediate: Shift rs1 right by the immediate value and store the result in rd. The sign bit is preserved.
+    fn srai(&mut self, rd: u8, rs1: u8, imm: u32);
 }
 
 pub trait Interface {
@@ -154,6 +163,36 @@ impl CPU {
                 self.andi(args.rd, args.rs1, args.imm);
             }
 
+            RV32I::SLLI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SLLI")
+                };
+
+                self.slli(args.rd, args.rs1, args.imm);
+            }
+
+            RV32I::SRLI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SRLI")
+                };
+
+                self.srli(args.rd, args.rs1, args.imm);
+            }
+
+            RV32I::SRAI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SRAI")
+                };
+
+                self.srai(args.rd, args.rs1, args.imm);
+            }
+
             _ => {
                 return Err(format!("Unimplemented instruction: {:?}", inst));
             }
@@ -221,6 +260,21 @@ impl RV32ISA for CPU {
         let imm = sext(imm);
         self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 & imm) as u32;
     }
+
+    fn slli(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let shamt = imm & 0x1F;
+        self.regs[rd as usize] = self.regs[rs1 as usize] << shamt;
+    }
+    
+    fn srli(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let shamt = imm & 0x1F;
+        self.regs[rd as usize] = self.regs[rs1 as usize] >> shamt;
+    }
+    
+    fn srai(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let shamt = imm & 0x1F;
+        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 >> shamt) as u32;
+    }    
 }
 
 fn sext(x: u32) -> i32 {
