@@ -13,6 +13,21 @@ pub struct CPU {
 trait RV32ISA {
     // Add Immediate: Adds an immediate value to rs1 and stores the result in rd.
     fn addi(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // Set Less Than Immediate: If rs1 is less than the immediate value, set rd to 1, otherwise set rd to 0.
+    fn slti(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // Set Less Than Immediate Unsigned: If rs1 is less than the immediate value, set rd to 1, otherwise set rd to 0.
+    fn sltiu(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // XOR Immediate: Bitwise XOR rs1 and the immediate value and store the result in rd.
+    fn xori(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // OR Immediate: Bitwise OR rs1 and the immediate value and store the result in rd.
+    fn ori(&mut self, rd: u8, rs1: u8, imm: u32);
+
+    // AND Immediate: Bitwise AND rs1 and the immediate value and store the result in rd.
+    fn andi(&mut self, rd: u8, rs1: u8, imm: u32);
 }
 
 pub trait Interface {
@@ -77,7 +92,7 @@ impl CPU {
         }
     }
 
-    fn execute(&mut self, inst: Instruction) -> u8 {
+    fn execute(&mut self, inst: Instruction) -> Result<u8, String> {
         match inst.inst {
             RV32I::ADDI => {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
@@ -89,13 +104,62 @@ impl CPU {
                 self.addi(args.rd, args.rs1, args.imm);
             }
 
+            RV32I::SLTI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SLTI")
+                };
+
+                self.slti(args.rd, args.rs1, args.imm);
+            }
+
+            RV32I::SLTIU => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for SLTIU")
+                };
+
+                self.sltiu(args.rd, args.rs1, args.imm);
+            }
+
+            RV32I::XORI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for XORI")
+                };
+
+                self.xori(args.rd, args.rs1, args.imm);
+            }
+
+            RV32I::ORI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for ORI")
+                };
+
+                self.ori(args.rd, args.rs1, args.imm);
+            }
+
+            RV32I::ANDI => {
+                let args = if let InstructionType::I(inst) = inst.inst_type {
+                    inst
+                } else {
+                    panic!("Invalid instruction type for ANDI")
+                };
+
+                self.andi(args.rd, args.rs1, args.imm);
+            }
+
             _ => {
-                println!("Unimplemented instruction: {:?}", inst);
-                return 1;
+                return Err(format!("Unimplemented instruction: {:?}", inst));
             }
         }
 
-        0
+        Ok(0)
     }
 }
 
@@ -110,7 +174,7 @@ impl Interface for CPU {
         loop {
             let inst = self.fetch();
             let inst = self.decode(inst);
-            self.execute(inst);
+            self.execute(inst).expect("Failed to execute instruction");
             self.last_inst = Some(inst);
             if self.exit_on_nop && inst.is_nop() {
                 return 0;
@@ -123,6 +187,39 @@ impl RV32ISA for CPU {
     fn addi(&mut self, rd: u8, rs1: u8, imm: u32) {
         let imm = sext(imm);
         self.regs[rd as usize] = self.regs[rs1 as usize].wrapping_add_signed(imm);
+    }
+
+    fn slti(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let imm = sext(imm);
+        self.regs[rd as usize] = if (self.regs[rs1 as usize] as i32) < imm {
+            1
+        } else {
+            0
+        };
+    }
+
+    fn sltiu(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let imm = sext(imm);
+        self.regs[rd as usize] = if self.regs[rs1 as usize] < imm as u32 {
+            1
+        } else {
+            0
+        };
+    }
+
+    fn xori(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let imm = sext(imm);
+        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 ^ imm) as u32;
+    }
+
+    fn ori(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let imm = sext(imm);
+        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 | imm) as u32;
+    }
+
+    fn andi(&mut self, rd: u8, rs1: u8, imm: u32) {
+        let imm = sext(imm);
+        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 & imm) as u32;
     }
 }
 
