@@ -52,8 +52,16 @@ pub struct I {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct U {
+    pub imm: u32,
+    pub rd: u8,
+    pub opcode: u8,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum InstructionType {
     I(I),
+    U(U),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -93,6 +101,31 @@ impl Instruction {
             _ => false,
         }
     }
+
+    pub fn to_bin(&self) -> u32 {
+        match self.inst_type {
+            InstructionType::I(i) => {
+                let mut inst = 0;
+
+                inst |= i.imm << 20;
+                inst |= (i.rs1 as u32) << 15;
+                inst |= (i.funct3 as u32) << 12;
+                inst |= (i.rd as u32) << 7;
+                inst |= i.opcode as u32;
+
+                inst
+            }
+            InstructionType::U(u) => {
+                let mut inst = 0;
+
+                inst |= u.imm << 12;
+                inst |= (u.rd as u32) << 7;
+                inst |= u.opcode as u32;
+
+                inst
+            }
+        }
+    }
 }
 
 fn get_opcode(inst: u32) -> u8 {
@@ -117,6 +150,14 @@ fn parse_inst(inst: u32) -> Result<InstructionType, String> {
                 rd,
                 opcode,
             }))
+        }
+
+        // U-Type
+        0b0110111 | 0b0010111 => {
+            let imm = inst >> 12;
+            let rd = ((inst >> 7) & 0x1F) as u8;
+
+            Ok(InstructionType::U(U { imm, rd, opcode }))
         }
 
         // NOP
@@ -183,6 +224,12 @@ fn get_inst(inst: InstructionType) -> Result<RV32I, String> {
                 Ok(RV32I::ADDI)
             }
             _ => Err(format!("Invalid funct3: {:#b}", i.funct3)),
+        },
+
+        InstructionType::U(u) => match u.opcode {
+            0b0110111 => Ok(RV32I::LUI),
+            0b0010111 => Ok(RV32I::AUIPC),
+            _ => Err(format!("Invalid opcode: {:#b}", u.opcode)),
         },
     }
 }

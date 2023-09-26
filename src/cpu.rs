@@ -198,6 +198,7 @@ impl CPU {
             }
         }
 
+        self.last_inst = Some(inst);
         Ok(0)
     }
 }
@@ -213,11 +214,10 @@ impl Interface for CPU {
         loop {
             let inst = self.fetch();
             let inst = self.decode(inst);
-            self.execute(inst).expect("Failed to execute instruction");
-            self.last_inst = Some(inst);
             if self.exit_on_nop && inst.is_nop() {
                 return 0;
             }
+            self.execute(inst).expect("Failed to execute instruction");
         }
     }
 }

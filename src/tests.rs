@@ -1,13 +1,9 @@
 use crate::cpu::{Interface, CPU};
 
-fn init_cpu_test() -> CPU {
-    let mut cpu = CPU::new();
-    cpu.exit_on_nop = true;
-    cpu
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::init_cpu_test;
+
     use super::*;
 
     #[test]

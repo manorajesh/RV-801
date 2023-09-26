@@ -1,4 +1,4 @@
-use cpu::CPU;
+use cpu::{Interface, CPU};
 use eframe::egui;
 use egui::*;
 use isa::Instruction;
@@ -30,7 +30,7 @@ impl Default for CPUDebugView {
     fn default() -> Self {
         Self {
             instructions: String::new(),
-            cpu: CPU::new(),
+            cpu: init_cpu_test(),
             instruction_status: Ok(String::new()),
         }
     }
@@ -47,16 +47,28 @@ impl eframe::App for CPUDebugView {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.label("Instructions:");
-                    ui.text_edit_singleline(&mut self.instructions);
-                    if ui
+                    ui.text_edit_multiline(&mut self.instructions).context_menu(|ui| {
+                        if ui.button("Clear").clicked() {
+                            self.instructions.clear();
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        if ui
                         .button("Run")
                         .on_hover_text("Execute the instruction")
                         .clicked()
                     {
+                        let instructions = self.instructions.lines().collect();
                         self.instruction_status =
-                            execute_instruction(&mut self.cpu, &self.instructions);
+                            execute_instructions(&mut self.cpu, instructions);
                     }
+                    if ui.small_button("Reset").on_hover_text("Reset CPU (clear registers, pc, and memory)").clicked() {
+                        self.cpu = init_cpu_test();
+                        self.instruction_status = Ok(String::new());
+                    };
+                    })
                 });
+
                 // Instruction status
                 match self.instruction_status {
                     Ok(ref status) => {
@@ -67,6 +79,12 @@ impl eframe::App for CPUDebugView {
                     }
                 }
             });
+
+            ui.add_space(5.0);
+            ui.label("Binary:");
+            if let Some(last_inst) = self.cpu.last_inst {
+                ui.label(format!("{:032b}", last_inst.to_bin()));
+            }
 
             ui.add_space(10.0);
             ui.separator();
@@ -85,6 +103,14 @@ impl eframe::App for CPUDebugView {
                             ui.label("Registers:").on_hover_text(
                                 "The registers of the CPU (what each instruction operates on)",
                             );
+                            // PC
+                            ui.horizontal(|ui| {
+                                ui.label("pc")
+                                    .on_hover_text("Program Counter is the address of the next instruction to be executed");
+                                ui.add_space(6.0);
+                                ui.add(egui::DragValue::new(&mut self.cpu.pc))
+                                    .on_hover_text("Program Counter is the address of the next instruction to be executed");
+                            });
                             for (i, reg) in self.cpu.regs.iter_mut().enumerate() {
                                 ui.horizontal(|ui| {
                                     let signed = *reg as i32;
@@ -95,14 +121,50 @@ impl eframe::App for CPUDebugView {
                                         .on_hover_text("Signed value of register");
                                 });
                             }
-                        })
+                        });
+
+                        ui.add_space(10.0);
+                        ui.separator();
+                        ui.add_space(10.0);
+
+                        ui.vertical(|ui| {
+                            ui.label("Memory:")
+                                .on_hover_text("First 256 bytes of memory (what the CPU reads from and writes to)");
+                        
+                            // Memory
+                            egui::Grid::new("memory_grid")
+                                .striped(true)
+                                .show(ui, |ui| {
+                                    for (i, byte) in self.cpu.memory.iter().take(256).enumerate() {
+                                        if i % 8 == 0 && i > 0 {
+                                            ui.end_row();
+                                        }
+                                        ui.label(format!("{:02X}", byte));
+                                    }
+                                });
+                        });
                     });
+                    
                 });
         });
     }
 }
 
-fn execute_instruction(cpu: &mut CPU, instruction_string: &str) -> Result<String, String> {
+fn execute_instructions(cpu: &mut CPU, insts: Vec<&str>) -> Result<String, String> {
+    let mut status = String::new();
+    for inst in insts {
+        let mnemonic = inst.split_whitespace().next().unwrap();
+        match mnemonic {
+            "addi" | "slti" | "sltiu" | "xori" | "ori" | "andi" => {
+                status = execute_i_instruction(cpu, &inst)?;
+            }
+            _ => return Err("Invalid instruction".into()),
+        }
+    }
+    Ok(status)
+}
+
+fn execute_i_instruction(cpu: &mut CPU, instruction_string: &str) -> Result<String, String> {
     let args: Vec<_> = instruction_string.split_whitespace().collect();
 
     let (inst, rd, rs1, imm) = match args.as_slice() {
@@ -138,9 +200,8 @@ fn execute_instruction(cpu: &mut CPU, instruction_string: &str) -> Result<String
         _ => return Err("Invalid instruction".into()),
     };
 
-    if let Err(e) = cpu.execute(instruction) {
-        return Err(format!("Failed to execute instruction: {}", e));
-    }
+    cpu.from_inst(vec![instruction.to_bin()]);
+    cpu.run();
 
     Ok(format!("Executed instruction: {}", instruction_string))
 }
@@ -166,4 +227,10 @@ fn parse_imm(imm: &str) -> u32 {
         let imm = i32::from_str_radix(imm, 10).unwrap();
         imm as u32
     })
+}
+
+pub fn init_cpu_test() -> CPU {
+    let mut cpu = CPU::new();
+    cpu.exit_on_nop = true;
+    cpu
 }
