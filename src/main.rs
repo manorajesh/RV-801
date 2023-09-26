@@ -23,7 +23,7 @@ fn main() -> Result<(), eframe::Error> {
 struct CPUDebugView {
     instructions: String,
     cpu: CPU,
-    instruction_status: Option<String>,
+    instruction_status: Result<String, String>,
 }
 
 impl Default for CPUDebugView {
@@ -31,7 +31,7 @@ impl Default for CPUDebugView {
         Self {
             instructions: String::new(),
             cpu: CPU::new(),
-            instruction_status: None,
+            instruction_status: Ok(String::new()),
         }
     }
 }
@@ -54,18 +54,17 @@ impl eframe::App for CPUDebugView {
                         .clicked()
                     {
                         self.instruction_status =
-                            Some(execute_instruction(&mut self.cpu, &self.instructions));
+                            execute_instruction(&mut self.cpu, &self.instructions);
                     }
                 });
                 // Instruction status
-                if let Some(status) = &self.instruction_status {
-                    let color = if status == "Done!" {
-                        Color32::GREEN
-                    } else {
-                        Color32::RED
-                    };
-
-                    ui.colored_label(color, status);
+                match self.instruction_status {
+                    Ok(ref status) => {
+                        ui.colored_label(Color32::GREEN, status);
+                    }
+                    Err(ref status) => {
+                        ui.colored_label(Color32::RED, status);
+                    }
                 }
             });
 
@@ -103,107 +102,68 @@ impl eframe::App for CPUDebugView {
     }
 }
 
-fn execute_instruction(cpu: &mut CPU, instruction_string: &String) -> String {
-    let args = instruction_string.split_whitespace().collect::<Vec<_>>();
-    let inst = args.get(0);
-    let rd = args.get(1);
-    let rs1 = args.get(2);
-    let imm = args.get(3);
+fn execute_instruction(cpu: &mut CPU, instruction_string: &str) -> Result<String, String> {
+    let args: Vec<_> = instruction_string.split_whitespace().collect();
 
-    if inst.is_some() && rd.is_some() && rs1.is_some() && imm.is_some() {
-        let rd = rd.unwrap().replace("x", "").remove(0).to_digit(10).unwrap() as u8;
-        let rs1 = rs1
-            .unwrap()
-            .replace("x", "")
-            .remove(0)
-            .to_digit(10)
-            .unwrap() as u8;
-        let _ = match inst.unwrap() {
-            &"addi" => cpu.execute(Instruction {
-                inst: isa::RV32I::ADDI,
-                inst_type: isa::InstructionType::I(isa::I {
-                    imm: parse_imm(imm.unwrap()),
-                    rs1: rs1,
-                    funct3: 0,
-                    rd: rd,
-                    opcode: 0x13,
-                }),
-                raw: 0,
-            }),
+    let (inst, rd, rs1, imm) = match args.as_slice() {
+        [i, rd, rs1, imm, ..] => (i, rd, rs1, imm),
+        _ => return Err("Insufficient arguments or invalid instruction".into()),
+    };
 
-            &"slti" => cpu.execute(Instruction {
-                inst: isa::RV32I::SLTI,
-                inst_type: isa::InstructionType::I(isa::I {
-                    imm: parse_imm(imm.unwrap()),
-                    rs1: rs1,
-                    funct3: 2,
-                    rd: rd,
-                    opcode: 0x13,
-                }),
-                raw: 0,
-            }),
+    let reg_match: &[_] = &[',', 'x'];
+    let rd = rd
+        .trim_matches(reg_match)
+        .parse()
+        .map_err(|_| format!("Failed to parse rd: {rd}"))?;
+    let rs1 = rs1
+        .trim_matches(reg_match)
+        .parse()
+        .map_err(|_| format!("Failed to parse rs1: {rs1}"))?;
 
-            &"sltiu" => cpu.execute(Instruction {
-                inst: isa::RV32I::SLTIU,
-                inst_type: isa::InstructionType::I(isa::I {
-                    imm: parse_imm(imm.unwrap()),
-                    rs1: rs1,
-                    funct3: 3,
-                    rd: rd,
-                    opcode: 0x13,
-                }),
-                raw: 0,
-            }),
-
-            &"xori" => cpu.execute(Instruction {
-                inst: isa::RV32I::XORI,
-                inst_type: isa::InstructionType::I(isa::I {
-                    imm: parse_imm(imm.unwrap()),
-                    rs1: rs1,
-                    funct3: 4,
-                    rd: rd,
-                    opcode: 0x13,
-                }),
-                raw: 0,
-            }),
-
-            &"ori" => cpu.execute(Instruction {
-                inst: isa::RV32I::ORI,
-                inst_type: isa::InstructionType::I(isa::I {
-                    imm: parse_imm(imm.unwrap()),
-                    rs1: rs1,
-                    funct3: 6,
-                    rd: rd,
-                    opcode: 0x13,
-                }),
-                raw: 0,
-            }),
-
-            &"andi" => cpu.execute(Instruction {
-                inst: isa::RV32I::ANDI,
-                inst_type: isa::InstructionType::I(isa::I {
-                    imm: parse_imm(imm.unwrap()),
-                    rs1: rs1,
-                    funct3: 7,
-                    rd: rd,
-                    opcode: 0x13,
-                }),
-                raw: 0,
-            }),
-
-            _ => {
-                return "Invalid instruction".to_string();
-            }
-        };
-    } else {
-        return "Invalid instruction".to_string();
+    if rd > 31 {
+        return Err("Invalid rd".into());
     }
-    return "Done!".to_string();
+
+    if rs1 > 31 {
+        return Err("Invalid rs1".into());
+    }
+
+    let instruction = match *inst {
+        "addi" => Instruction::new(isa::RV32I::ADDI, parse_imm(imm), rs1, 0, rd),
+        "slti" => Instruction::new(isa::RV32I::SLTI, parse_imm(imm), rs1, 2, rd),
+        "sltiu" => Instruction::new(isa::RV32I::SLTIU, parse_imm(imm), rs1, 3, rd),
+        "xori" => Instruction::new(isa::RV32I::XORI, parse_imm(imm), rs1, 4, rd),
+        "ori" => Instruction::new(isa::RV32I::ORI, parse_imm(imm), rs1, 6, rd),
+        "andi" => Instruction::new(isa::RV32I::ANDI, parse_imm(imm), rs1, 7, rd),
+        _ => return Err("Invalid instruction".into()),
+    };
+
+    if let Err(e) = cpu.execute(instruction) {
+        return Err(format!("Failed to execute instruction: {}", e));
+    }
+
+    Ok(format!("Executed instruction: {}", instruction_string))
+}
+
+impl Instruction {
+    fn new(inst: isa::RV32I, imm: u32, rs1: i32, funct3: i32, rd: i32) -> Self {
+        Self {
+            inst,
+            inst_type: isa::InstructionType::I(isa::I {
+                imm,
+                rs1: rs1 as u8,
+                funct3: funct3 as u8,
+                rd: rd as u8,
+                opcode: 0x13,
+            }),
+            raw: 0,
+        }
+    }
 }
 
 fn parse_imm(imm: &str) -> u32 {
     imm.parse().unwrap_or_else(|_| {
-        let imm = i32::from_str_radix(imm, 16).unwrap();
+        let imm = i32::from_str_radix(imm, 10).unwrap();
         imm as u32
     })
 }

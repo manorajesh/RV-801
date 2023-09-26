@@ -107,7 +107,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for ADDI")
+                    return Err(String::from("Invalid instruction type for ADDI"));
                 };
 
                 self.addi(args.rd, args.rs1, args.imm);
@@ -117,7 +117,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for SLTI")
+                    return Err(String::from("Invalid instruction type for SLTI"));
                 };
 
                 self.slti(args.rd, args.rs1, args.imm);
@@ -127,7 +127,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for SLTIU")
+                    return Err(String::from("Invalid instruction type for SLTIU"));
                 };
 
                 self.sltiu(args.rd, args.rs1, args.imm);
@@ -137,7 +137,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for XORI")
+                    return Err(String::from("Invalid instruction type for XORI"));
                 };
 
                 self.xori(args.rd, args.rs1, args.imm);
@@ -147,7 +147,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for ORI")
+                    return Err(String::from("Invalid instruction type for ORI"));
                 };
 
                 self.ori(args.rd, args.rs1, args.imm);
@@ -157,7 +157,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for ANDI")
+                    return Err(String::from("Invalid instruction type for ANDI"));
                 };
 
                 self.andi(args.rd, args.rs1, args.imm);
@@ -167,7 +167,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for SLLI")
+                    return Err(String::from("Invalid instruction type for SLLI"));
                 };
 
                 self.slli(args.rd, args.rs1, args.imm);
@@ -177,7 +177,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for SRLI")
+                    return Err(String::from("Invalid instruction type for SRLI"));
                 };
 
                 self.srli(args.rd, args.rs1, args.imm);
@@ -187,7 +187,7 @@ impl CPU {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
                     inst
                 } else {
-                    panic!("Invalid instruction type for SRAI")
+                    return Err(String::from("Invalid instruction type for SRAI"));
                 };
 
                 self.srai(args.rd, args.rs1, args.imm);
