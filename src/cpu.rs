@@ -5,7 +5,7 @@ use crate::isa::{Instruction, InstructionType, RV32I};
 pub struct CPU {
     pub regs: [u32; 32],
     pub pc: usize,
-    memory: [u8; 0x10000],
+    pub memory: [u8; 0x10000],
     pub exit_on_nop: bool,
     pub last_inst: Option<Instruction>,
 }
@@ -101,7 +101,7 @@ impl CPU {
         }
     }
 
-    fn execute(&mut self, inst: Instruction) -> Result<u8, String> {
+    pub fn execute(&mut self, inst: Instruction) -> Result<u8, String> {
         match inst.inst {
             RV32I::ADDI => {
                 let args = if let InstructionType::I(inst) = inst.inst_type {
@@ -265,16 +265,16 @@ impl RV32ISA for CPU {
         let shamt = imm & 0x1F;
         self.regs[rd as usize] = self.regs[rs1 as usize] << shamt;
     }
-    
+
     fn srli(&mut self, rd: u8, rs1: u8, imm: u32) {
         let shamt = imm & 0x1F;
         self.regs[rd as usize] = self.regs[rs1 as usize] >> shamt;
     }
-    
+
     fn srai(&mut self, rd: u8, rs1: u8, imm: u32) {
         let shamt = imm & 0x1F;
         self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 >> shamt) as u32;
-    }    
+    }
 }
 
 fn sext(x: u32) -> i32 {
