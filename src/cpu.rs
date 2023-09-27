@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::isa::{Instruction, InstructionType, RV32I};
+use crate::isa::{ Instruction, InstructionType, RV32I };
 
 pub struct CPU {
     pub regs: [u32; 32],
@@ -42,9 +42,9 @@ trait RV32ISA {
 pub trait Interface {
     fn load(&mut self, instructions: &[u8]);
 
-    fn run(&mut self) -> u8;
+    fn run(&mut self) -> Result<String, String>;
 
-    fn boot(&mut self, path: &str, radix: u8) -> u8 {
+    fn boot(&mut self, path: &str, radix: u8) -> Result<String, String> {
         let instructions_str = fs::read_to_string(path).expect("Unable to read file");
         let mut instructions_bytes = Vec::new();
 
@@ -90,7 +90,7 @@ impl CPU {
         inst
     }
 
-    fn decode(&self, inst: u32) -> Instruction {
+    fn decode(&self, inst: u32) -> Result<Instruction, String> {
         Instruction::from(inst)
     }
 
@@ -210,12 +210,12 @@ impl Interface for CPU {
         }
     }
 
-    fn run(&mut self) -> u8 {
+    fn run(&mut self) -> Result<String, String> {
         loop {
             let inst = self.fetch();
-            let inst = self.decode(inst);
+            let inst = self.decode(inst)?;
             if self.exit_on_nop && inst.is_nop() {
-                return 0;
+                return Ok(String::from("NOP... Quitting"));
             }
             self.execute(inst).expect("Failed to execute instruction");
         }
@@ -230,50 +230,42 @@ impl RV32ISA for CPU {
 
     fn slti(&mut self, rd: u8, rs1: u8, imm: u32) {
         let imm = sext(imm);
-        self.regs[rd as usize] = if (self.regs[rs1 as usize] as i32) < imm {
-            1
-        } else {
-            0
-        };
+        self.regs[rd as usize] = if (self.regs[rs1 as usize] as i32) < imm { 1 } else { 0 };
     }
 
     fn sltiu(&mut self, rd: u8, rs1: u8, imm: u32) {
         let imm = sext(imm);
-        self.regs[rd as usize] = if self.regs[rs1 as usize] < imm as u32 {
-            1
-        } else {
-            0
-        };
+        self.regs[rd as usize] = if self.regs[rs1 as usize] < (imm as u32) { 1 } else { 0 };
     }
 
     fn xori(&mut self, rd: u8, rs1: u8, imm: u32) {
         let imm = sext(imm);
-        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 ^ imm) as u32;
+        self.regs[rd as usize] = ((self.regs[rs1 as usize] as i32) ^ imm) as u32;
     }
 
     fn ori(&mut self, rd: u8, rs1: u8, imm: u32) {
         let imm = sext(imm);
-        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 | imm) as u32;
+        self.regs[rd as usize] = ((self.regs[rs1 as usize] as i32) | imm) as u32;
     }
 
     fn andi(&mut self, rd: u8, rs1: u8, imm: u32) {
         let imm = sext(imm);
-        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 & imm) as u32;
+        self.regs[rd as usize] = ((self.regs[rs1 as usize] as i32) & imm) as u32;
     }
 
     fn slli(&mut self, rd: u8, rs1: u8, imm: u32) {
-        let shamt = imm & 0x1F;
+        let shamt = imm & 0x1f;
         self.regs[rd as usize] = self.regs[rs1 as usize] << shamt;
     }
 
     fn srli(&mut self, rd: u8, rs1: u8, imm: u32) {
-        let shamt = imm & 0x1F;
+        let shamt = imm & 0x1f;
         self.regs[rd as usize] = self.regs[rs1 as usize] >> shamt;
     }
 
     fn srai(&mut self, rd: u8, rs1: u8, imm: u32) {
-        let shamt = imm & 0x1F;
-        self.regs[rd as usize] = (self.regs[rs1 as usize] as i32 >> shamt) as u32;
+        let shamt = imm & 0x1f;
+        self.regs[rd as usize] = ((self.regs[rs1 as usize] as i32) >> shamt) as u32;
     }
 }
 

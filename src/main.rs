@@ -1,4 +1,4 @@
-use cpu::{Interface, CPU};
+use cpu::{ Interface, CPU };
 use eframe::egui;
 use egui::*;
 use isa::Instruction;
@@ -16,7 +16,7 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "RV32I CPU",
         options,
-        Box::new(|_cc| Box::<CPUDebugView>::default()),
+        Box::new(|_cc| Box::<CPUDebugView>::default())
     )
 }
 
@@ -24,6 +24,7 @@ struct CPUDebugView {
     instructions: String,
     cpu: CPU,
     instruction_status: Result<String, String>,
+    instruction_history: Vec<String>,
 }
 
 impl Default for CPUDebugView {
@@ -32,6 +33,7 @@ impl Default for CPUDebugView {
             instructions: String::new(),
             cpu: init_cpu_test(),
             instruction_status: Ok(String::new()),
+            instruction_history: Vec::new(),
         }
     }
 }
@@ -53,19 +55,33 @@ impl eframe::App for CPUDebugView {
                         }
                     });
                     ui.horizontal(|ui| {
-                        if ui
-                        .button("Run")
-                        .on_hover_text("Execute the instruction")
-                        .clicked()
-                    {
-                        let instructions = self.instructions.lines().collect();
-                        self.instruction_status =
-                            execute_instructions(&mut self.cpu, instructions);
-                    }
-                    if ui.small_button("Reset").on_hover_text("Reset CPU (clear registers, pc, and memory)").clicked() {
-                        self.cpu = init_cpu_test();
-                        self.instruction_status = Ok(String::new());
-                    };
+                        if
+                            ui
+                                .button("Run")
+                                .on_hover_text("Execute the instruction (append to memory)")
+                                .clicked()
+                        {
+                            let instructions = self.instructions.lines().collect();
+                            self.instruction_status = execute_instructions(
+                                &mut self.cpu,
+                                instructions
+                            );
+                            if self.instruction_status.is_ok() {
+                                self.instruction_history.extend(
+                                    self.instructions.lines().map(|s| s.to_string())
+                                );
+                            }
+                        }
+                        if
+                            ui
+                                .small_button("Reset")
+                                .on_hover_text("Reset CPU (clear registers, pc, and memory)")
+                                .clicked()
+                        {
+                            self.cpu = init_cpu_test();
+                            self.instruction_status = Ok(String::new());
+                            self.instruction_history.clear();
+                        }
                     })
                 });
 
@@ -81,9 +97,11 @@ impl eframe::App for CPUDebugView {
             });
 
             ui.add_space(5.0);
-            ui.label("Binary:");
+            ui.label("Binary:").on_hover_text("Binary representation of last instruction");
             if let Some(last_inst) = self.cpu.last_inst {
                 ui.label(format!("{:032b}", last_inst.to_bin()));
+            } else {
+                ui.label("00000000000000000000000000000000");
             }
 
             ui.add_space(10.0);
@@ -93,7 +111,7 @@ impl eframe::App for CPUDebugView {
             ui.strong("CPU State");
             ui.add_space(5.0);
 
-            // Registers
+            // CPU state
             ScrollArea::vertical()
                 .auto_shrink([false, true])
                 .stick_to_bottom(false)
@@ -101,24 +119,29 @@ impl eframe::App for CPUDebugView {
                     ui.horizontal(|ui| {
                         ui.vertical(|ui| {
                             ui.label("Registers:").on_hover_text(
-                                "The registers of the CPU (what each instruction operates on)",
+                                "The registers of the CPU (what each instruction operates on)"
                             );
                             // PC
                             ui.horizontal(|ui| {
-                                ui.label("pc")
-                                    .on_hover_text("Program Counter is the address of the next instruction to be executed");
-                                ui.add_space(6.0);
-                                ui.add(egui::DragValue::new(&mut self.cpu.pc))
-                                    .on_hover_text("Program Counter is the address of the next instruction to be executed");
+                                ui.label("pc").on_hover_text(
+                                    "Program Counter is the address of the next instruction to be executed"
+                                );
+                                ui.add_space(7.5);
+                                ui.add(egui::DragValue::new(&mut self.cpu.pc)).on_hover_text(
+                                    "Program Counter is the address of the next instruction to be executed"
+                                );
                             });
                             for (i, reg) in self.cpu.regs.iter_mut().enumerate() {
                                 ui.horizontal(|ui| {
                                     let signed = *reg as i32;
                                     ui.label(format!("x{:02}", i));
-                                    ui.add(egui::DragValue::new(reg))
-                                        .on_hover_text("Unsigned value of register");
-                                    ui.colored_label(Color32::DARK_GRAY, format!("({})", signed))
-                                        .on_hover_text("Signed value of register");
+                                    ui.add(egui::DragValue::new(reg)).on_hover_text(
+                                        "Unsigned value of register"
+                                    );
+                                    ui.colored_label(
+                                        Color32::DARK_GRAY,
+                                        format!("({})", signed)
+                                    ).on_hover_text("Signed value of register");
                                 });
                             }
                         });
@@ -128,23 +151,59 @@ impl eframe::App for CPUDebugView {
                         ui.add_space(10.0);
 
                         ui.vertical(|ui| {
-                            ui.label("Memory:")
-                                .on_hover_text("First 256 bytes of memory (what the CPU reads from and writes to)");
-                        
+                            ui.label("Memory:").on_hover_text(
+                                "First 128 bytes of memory in hex (what the CPU reads from and writes to)"
+                            );
+
                             // Memory
-                            egui::Grid::new("memory_grid")
+                            egui::Grid
+                                ::new("memory_grid")
                                 .striped(true)
                                 .show(ui, |ui| {
-                                    for (i, byte) in self.cpu.memory.iter().take(256).enumerate() {
-                                        if i % 8 == 0 && i > 0 {
+                                    for (i, byte) in self.cpu.memory
+                                        .iter_mut()
+                                        .take(128)
+                                        .enumerate() {
+                                        if i % 4 == 0 && i > 0 {
                                             ui.end_row();
                                         }
-                                        ui.label(format!("{:02X}", byte));
+                                        ui.add(
+                                            egui::DragValue::new(byte).hexadecimal(1, false, true)
+                                        ).on_hover_text(format!("Memory address: 0x{:08X}", i));
                                     }
                                 });
                         });
+
+                        // History
+                        ui.add_space(10.0);
+                        ui.separator();
+                        ui.add_space(10.0);
+                        ScrollArea::vertical()
+                            .auto_shrink([false, true])
+                            .stick_to_bottom(false)
+                            .show(ui, |ui| {
+                                ui.vertical(|ui| {
+                                    ui.label("History:").on_hover_text(
+                                        "Instructions that have been executed"
+                                    );
+                                    for (i, inst) in self.instruction_history.iter().enumerate() {
+                                        ui.horizontal(|ui| {
+                                            ui.label(format!("{:02}", i));
+                                            // arrow right
+                                            ui.label("—");
+                                            ui.label(inst).on_hover_text(
+                                                format!(
+                                                    "{:032b}",
+                                                    parse_i_instructions(inst)
+                                                        .unwrap_or(Instruction::nop())
+                                                        .to_bin()
+                                                )
+                                            );
+                                        });
+                                    }
+                                })
+                            });
                     });
-                    
                 });
         });
     }
@@ -153,23 +212,27 @@ impl eframe::App for CPUDebugView {
 fn execute_instructions(cpu: &mut CPU, insts: Vec<&str>) -> Result<String, String> {
     let mut status = String::new();
     for inst in insts {
-        let mnemonic = inst.split_whitespace().next().unwrap();
+        let mnemonic = inst.split_whitespace().next().ok_or("Invalid instruction")?;
         match mnemonic {
-            "addi" | "slti" | "sltiu" | "xori" | "ori" | "andi" => {
+            "addi" | "slti" | "sltiu" | "xori" | "ori" | "andi" | "slli" | "srli" | "srai" => {
                 status = execute_i_instruction(cpu, &inst)?;
             }
-            _ => return Err("Invalid instruction".into()),
+            _ => {
+                return Err("Invalid instruction".into());
+            }
         }
     }
     Ok(status)
 }
 
-fn execute_i_instruction(cpu: &mut CPU, instruction_string: &str) -> Result<String, String> {
+fn parse_i_instructions(instruction_string: &str) -> Result<Instruction, String> {
     let args: Vec<_> = instruction_string.split_whitespace().collect();
 
     let (inst, rd, rs1, imm) = match args.as_slice() {
         [i, rd, rs1, imm, ..] => (i, rd, rs1, imm),
-        _ => return Err("Insufficient arguments or invalid instruction".into()),
+        _ => {
+            return Err("Insufficient arguments or invalid instruction".into());
+        }
     };
 
     let reg_match: &[_] = &[',', 'x'];
@@ -191,17 +254,28 @@ fn execute_i_instruction(cpu: &mut CPU, instruction_string: &str) -> Result<Stri
     }
 
     let instruction = match *inst {
-        "addi" => Instruction::new(isa::RV32I::ADDI, parse_imm(imm), rs1, 0, rd),
-        "slti" => Instruction::new(isa::RV32I::SLTI, parse_imm(imm), rs1, 2, rd),
-        "sltiu" => Instruction::new(isa::RV32I::SLTIU, parse_imm(imm), rs1, 3, rd),
-        "xori" => Instruction::new(isa::RV32I::XORI, parse_imm(imm), rs1, 4, rd),
-        "ori" => Instruction::new(isa::RV32I::ORI, parse_imm(imm), rs1, 6, rd),
-        "andi" => Instruction::new(isa::RV32I::ANDI, parse_imm(imm), rs1, 7, rd),
-        _ => return Err("Invalid instruction".into()),
+        "addi" => Instruction::new(isa::RV32I::ADDI, parse_imm(imm)?, rs1, 0, rd),
+        "slti" => Instruction::new(isa::RV32I::SLTI, parse_imm(imm)?, rs1, 2, rd),
+        "sltiu" => Instruction::new(isa::RV32I::SLTIU, parse_imm(imm)?, rs1, 3, rd),
+        "xori" => Instruction::new(isa::RV32I::XORI, parse_imm(imm)?, rs1, 4, rd),
+        "ori" => Instruction::new(isa::RV32I::ORI, parse_imm(imm)?, rs1, 6, rd),
+        "andi" => Instruction::new(isa::RV32I::ANDI, parse_imm(imm)?, rs1, 7, rd),
+        "slli" => Instruction::new(isa::RV32I::SLLI, parse_imm(imm)?, rs1, 1, rd),
+        "srli" => Instruction::new(isa::RV32I::SRLI, parse_imm(imm)?, rs1, 5, rd),
+        "srai" => Instruction::new(isa::RV32I::SRAI, parse_imm(imm)?, rs1, 5, rd),
+        _ => {
+            return Err("Invalid instruction".into());
+        }
     };
 
+    Ok(instruction)
+}
+
+fn execute_i_instruction(cpu: &mut CPU, instruction_string: &str) -> Result<String, String> {
+    let instruction = parse_i_instructions(instruction_string)?;
+
     cpu.from_inst(vec![instruction.to_bin()]);
-    cpu.run();
+    cpu.run()?;
 
     Ok(format!("Executed instruction: {}", instruction_string))
 }
@@ -222,14 +296,19 @@ impl Instruction {
     }
 }
 
-fn parse_imm(imm: &str) -> u32 {
-    imm.parse().unwrap_or_else(|_| {
-        let imm = i32::from_str_radix(imm, 10).unwrap();
-        imm as u32
-    })
+fn parse_imm(imm: &str) -> Result<u32, String> {
+    if let Ok(value) = imm.parse::<u32>() {
+        return Ok(value);
+    }
+
+    if let Ok(value) = imm.parse::<i32>() {
+        return Ok(value as u32);
+    }
+
+    Err(format!("Invalid immediate value (only numbers): {}", imm))
 }
 
-pub fn init_cpu_test() -> CPU {
+fn init_cpu_test() -> CPU {
     let mut cpu = CPU::new();
     cpu.exit_on_nop = true;
     cpu
